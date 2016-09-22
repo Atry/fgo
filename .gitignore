@@ -1,0 +1,8 @@
+*.o
+*.pyc
+.#*
+demo/dist
+demo/img
+demo/data
+node_modules
+bower_components

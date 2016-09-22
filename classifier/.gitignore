@@ -1,0 +1,6 @@
+*.pyc
+output
+imagenet
+weights
+__pycache__
+.#*
