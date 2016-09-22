@@ -41,43 +41,6 @@ def draw_labels(im, f):
   return im
 
 
-def extract_max(predictions, meta, labels):
-  N, H, W, C = predictions.shape
-  W_orig, H_orig = meta['original_size']
-  W_scale, H_scale = W/W_orig, H/H_orig
-  all_regions = predictions.argmax(axis=3)
-  X, Y = np.meshgrid(range(W), range(H))
-
-  def get_uniques(regions):
-    return np.unique(regions, return_inverse=True, return_counts=True)
-
-  def get_coordinates(classes, indices):
-    c = []
-    for i,cl in enumerate(classes):
-      coord_indices = indices == i
-      x, y = X.flat[coord_indices], Y.flat[coord_indices]
-      c.append(np.vstack([x, y]))
-    return c
-
-  def means(coord_list):
-    return np.vstack([np.median(c, axis=1) for c in coord_list]).T
-
-  def scaled(coords):
-    return np.vstack([coords[0]/W_scale, coords[1]/H_scale])
-
-  classes, indices, counts = zip(*[get_uniques(regions) for regions in all_regions])
-  argsort = [np.argsort(c)[::-1][:2] for c in counts]
-  coordinates = [get_coordinates(u,i) for u,i in zip(classes, indices)]
-  mean_coordinates = [means(coords) for coords in coordinates]
-  scaled_coordinates = [scaled(c) for c in mean_coordinates]
-  encoded = [[(xy[0,i], xy[1,i], c[i])
-             for i in s]
-             for xy, c, s in zip(scaled_coordinates, classes, argsort)]
-
-  with_labels = [[(x, y, labels[str(c)]) for x,y,c in coords] for coords in encoded]
-  return with_labels
-
-
 def extract_all(predictions, meta, labels):
   MAX = 2
   N, H, W, C = predictions.shape
@@ -121,8 +84,9 @@ def main():
   parser.add_argument('metadata')
   parser.add_argument('predictions')
   parser.add_argument('labels')
-  # parser.add_argument('video')
-  parser.add_argument('output')
+  parser.add_argument('--video_output')
+  parser.add_argument('--npy_output')
+  parser.add_argument('--json_output')
   args = parser.parse_args()
 
   meta = read_metadata(args.metadata)
@@ -131,21 +95,21 @@ def main():
   filenames = get_filenames(args.predictions, keyfunc)
   predictions = np.stack([np.load(f) for f in filenames])
 
-  # plt.matshow(predictions[0].argmax(axis=2))
-  # plt.show()
-  # return
-
   W_orig, H_orig = meta['original_size']
 
-  # with_labels = extract_max(predictions, meta, labels)
-  with_labels = extract_all(predictions, meta, labels)
+  if args.video_output is not None:
+    # with_labels = extract_max(predictions, meta, labels)
+    with_labels = extract_all(predictions, meta, labels)
 
-  def frames_generator():
-    for i,f in enumerate(with_labels):
-        blank = Image.new('L', (W_orig, H_orig))
-        yield draw_labels(blank, f)
+    def frames_generator():
+      for i,f in enumerate(with_labels):
+          blank = Image.new('L', (W_orig, H_orig))
+          yield draw_labels(blank, f)
 
-  video.images_to_video(frames_generator(), args.output, meta['sampled_fps'], meta['true_fps'])
+    video.images_to_video(frames_generator(), args.output, meta['sampled_fps'], meta['true_fps'])
+
+  if args.npy_output is not None:
+    np.save(args.npy_output, predictions)
 
 
 main()
