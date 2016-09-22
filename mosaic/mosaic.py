@@ -89,7 +89,7 @@ def mondrian_tiles(aspect_ratio, n_tiles):
             cells.append(np.vstack((a, cells2.pop(bi))))
         else:
             cells.append(a)
-    
+
     return list(map(add_blanks(0.005), map(get_coord(w_splits, h_splits), cells)))
 
 
@@ -113,7 +113,7 @@ def crop(aspect_ratio, img, tile):
     #     c['cx1'] += d
     #     c['cx2'] += d
     return c
-    
+
 
 def to_json(f, crop, tile):
     crop.update({'imfile': f, 'rot': 0})
