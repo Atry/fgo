@@ -19,7 +19,7 @@ function load_video() {
 function add_video_links(data) {
   var list = $("#video-links");
   list.empty();
-  data.forEach(v => 
+  data.forEach(v =>
     list.append($(sprintf('<li class="nav-item"><a class="nav-link" href="#%s">%s</a></li>', v.json, v.name)))
   );
   window.location.hash = data[0].json;

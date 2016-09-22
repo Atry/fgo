@@ -94,6 +94,7 @@ def main():
   keyfunc = lambda s: timecode_to_seconds('.'.join(s.split('.')[:-1]), meta['true_fps'])
   filenames = get_filenames(args.predictions, keyfunc)
   predictions = np.stack([np.load(f) for f in filenames])
+  print(predictions.shape)
 
   W_orig, H_orig = meta['original_size']
 
