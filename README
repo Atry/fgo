@@ -1,0 +1,12 @@
+### File formats
+
+#### predictions.npy
+Numpy array containing softmax output of neural network
+
+- shape: (N, W, H, C)
+  * N: frames
+  * W: width
+  * H: height
+  * C: labels
+  
+

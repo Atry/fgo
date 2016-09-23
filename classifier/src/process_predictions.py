@@ -92,9 +92,8 @@ def main():
   meta = read_metadata(args.metadata)
   labels = read_labels(args.labels)
   keyfunc = lambda s: timecode_to_seconds('.'.join(s.split('.')[:-1]), meta['true_fps'])
-  filenames = get_filenames(args.predictions, keyfunc)
+  filenames = get_filenames(args.predictions, keyfunc)[:1000]
   predictions = np.stack([np.load(f) for f in filenames])
-  print(predictions.shape)
 
   W_orig, H_orig = meta['original_size']
 
@@ -112,5 +111,13 @@ def main():
   if args.npy_output is not None:
     np.save(args.npy_output, predictions)
 
+  if args.json_output is not None:
+    sum_predictions = predictions.sum(axis=1).sum(axis=1).T
+    obj = dict(
+      predictions=dict(zip(labels[:5], sum_predictions.tolist()[:5])),
+      x=list(range(predictions.shape[0]))
+    )
+    with open(args.json_output, 'w') as fp:
+      json.dump(obj, fp)
 
 main()
