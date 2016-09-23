@@ -10,14 +10,16 @@ lazy val client = (project in file("app/js"))
       "org.scala-js" %%% "scalajs-dom" % "0.8.2",
       "com.lihaoyi" %%% "upickle" % "0.3.6",
       "com.lihaoyi" %%% "autowire" % "0.2.4",
-      "com.lihaoyi" %%% "scalatags" % "0.5.2"
+      "com.lihaoyi" %%% "scalatags" % "0.5.2",
+      "com.thoughtworks.binding" %%% "dom" % "9.0.2"
     ),
     jsDependencies ++= Seq(
       "org.webjars" % "d3js" % "3.5.16" / "3.5.16/d3.min.js",
       "org.webjars.bower" % "plottable" % "2.0.0" / "plottable.js" dependsOn "3.5.16/d3.min.js"
     ),
     persistLauncher in Compile := true,
-    skip in packageJSDependencies := false
+    skip in packageJSDependencies := false,
+    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
   )
   .enablePlugins(ScalaJSPlugin, ScalaJSWeb)
   .dependsOn(appJS)

@@ -8,6 +8,12 @@ import scala.scalajs.js.annotation.JSName
 object Plottable extends js.Object {
 
   @js.native
+  trait Point extends js.Object {
+    val x: Double
+    val y: Double
+  }
+
+  @js.native
   class Dataset[T](data: js.Array[T]) extends js.Object {
     def onUpdate(): Unit = js.native
   }
@@ -16,9 +22,16 @@ object Plottable extends js.Object {
   object Interactions extends js.Object {
 
     @js.native
-    class PanZoom(xScale: Scales.Scale)
-      extends js.Object {
+    trait Interaction extends js.Object {
       def attachTo(c: Components.Component): Unit = js.native
+    }
+
+    @js.native
+    class PanZoom(xScale: Scales.Scale) extends Interaction
+
+    @js.native
+    class Pointer() extends Interaction {
+      def onPointerEnter(cb: js.Function1[Point, Unit]): Unit = js.native
     }
 
   }

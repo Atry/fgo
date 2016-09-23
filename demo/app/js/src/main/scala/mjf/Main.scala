@@ -1,6 +1,6 @@
 package mjf
 
-import org.scalajs.dom
+import org.scalajs.dom.{ext, document}
 
 import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
@@ -17,14 +17,15 @@ import scala.concurrent.Future
 import scalajs.concurrent.JSExecutionContext.Implicits.runNow
 import scala.language.postfixOps
 import scala.scalajs.js.annotation.JSName
-
+import com.thoughtworks.binding.Binding.{Var, Vars}
+import com.thoughtworks.binding.dom
 
 import plottable.Plottable._
 
 
 object ClientAPI extends autowire.Client[Js.Value, Reader, Writer] {
   override def doCall(req: Request): Future[Js.Value] = {
-    dom.ext.Ajax.post(
+    ext.Ajax.post(
       url = "/api/" + req.path.mkString("/"),
       data = upickle.json.write(Js.Obj(req.args.toSeq: _*))
     ).map(_.responseText)
@@ -47,75 +48,97 @@ object TestAPI extends Api {
 }
 
 
-object GraphView {
-  def build(id: String, graph: Model.Graph) = {
-    val labels = graph.predictions.keys
-    val xDouble = graph.x map (_.toDouble)
-    val dataset = graph.predictions.values.map(_ zip xDouble).toList
+object View {
 
-//    val datasets = dataset.map(a => new Dataset(a.toJSArray)).toJSArray
+  object Graph {
+    def build(id: String, graph: Model.Graph) = {
+      val labels = graph.predictions.keys map (_.split(",").head)
+      val xDouble = graph.x map (_.toDouble)
+      val dataset = graph.predictions.values.map(_ zip xDouble).toList
 
+      val colorScale = new Scales.Color()
+      val xScale = new Scales.Linear()
+      val yScale = new Scales.Linear()
 
-    val colorScale = new Scales.Color()
-    val xScale = new Scales.Linear()
-    val yScale = new Scales.Linear()
+      val legend = new Components.Legend(colorScale)
+      colorScale.domain(labels.toJSArray)
+      legend.xAlignment("right")
+      legend.yAlignment("top")
+      legend.renderTo(id)
 
-    val legend = new Components.Legend(colorScale)
-    colorScale.domain(labels.toJSArray)
-    legend.xAlignment("right")
-    legend.yAlignment("top")
-    legend.renderTo(id)
+      val plots = new Components.Group[(Double, Double)]()
 
-    val plots = new Components.Group[(Double, Double)]()
+      val panZoom = new Interactions.PanZoom(xScale)
+      panZoom.attachTo(plots)
 
-    val panZoom = new Interactions.PanZoom(xScale)
-    panZoom.attachTo(plots)
+      dataset.zip(labels).foreach { case (set, label) => plots.append(
+        new Plots.Line[(Double, Double)]()
+          .addDataset(new Dataset(set.toJSArray))
+          .x((d: (Double, Double)) => d._2, xScale)
+          .y((d: (Double, Double)) => d._1, yScale)
+          .attr("stroke", colorScale.scale(label))
+      )
+      }
 
-    dataset.zip(labels).foreach { case (set, label) => plots.append(
-      new Plots.Line[(Double, Double)]()
-        .addDataset(new Dataset(set.toJSArray))
-        .x((d: (Double, Double)) => d._2, xScale)
-        .y((d: (Double, Double)) => d._1, yScale)
-        .attr("stroke", colorScale.scale(label))
-    )}
+      plots.renderTo(id)
+    }
 
-    plots.renderTo(id)
+//    @dom
+//    def root = svg(id := "graph", width := "100%", height := "100%")
 
-//    new Plots.Line[(Double, Double)]()
-//      .datasets(datasets)
-//      .x((d: (Double, Double)) => d._2, xScale)
-//      .y((d: (Double, Double)) => d._1, yScale)
-//      .renderTo(id)
-
+    //      <svg id="graph" width="100%" height="100%"></svg>
   }
 
-  def root = svg(id := "graph", width := "100%", height := "100%")
+//  @dom
+//  def keywords(words: List[String]) = {
+//    <ul>
+//      {for {w <- words} yield {
+//      <li>w</li>
+//    }}
+//    </ul>
+//  }
+
+//  @dom
+//  def toolbar =
+//  {
+//    div(cls := "navbar navbar-default",
+//      a(cls := "navbar-brand", "Montreux Jazz"),
+//      ul(cls := "nav navbar-nav"))
+//  }
+
+  @dom
+  def root = {
+    <div class="container-fluid">
+    </div>
+  }
+
+}
+
+
+object Handler {
+
+  //  case class RootModel(graph: Option[Model.Graph], keywords: List[String])
+
+  def fetchGraph(id: String) = {
+    ext.Ajax.get(s"/assets/$id.json").map(_.responseText)
+      .map(read[Model.Graph]) map updateGraph
+  }
+
+  def updateGraph(graph: Model.Graph) = View.Graph.build("svg#graph", graph)
+
+  def updateKeywords(graph: Model.Graph) = {
+    //    View.keywords(graph.predictions.keys)
+  }
 }
 
 
 object App extends JSApp {
 
-  def toolbar = {
-    div(cls := "navbar navbar-default",
-      a(cls := "navbar-brand", "Montreux Jazz"),
-      ul(cls := "nav navbar-nav"))
-  }
-
   def main(): Unit = {
-    import dom.ext._
 
-    val root = div(
-      div(cls := "container-fluid",
-        GraphView.root()
-      )
-    )
+    dom.render(document.body, View.root)
 
-    dom.document.body.appendChild(root.render)
-
-    dom.ext.Ajax.get("/assets/14MLA.json").map(_.responseText)
-      .map(read[Model.Graph]) map { graph =>
-      GraphView.build("svg#graph", graph)
-    }
+    Handler.fetchGraph("14MLA")
   }
 
 }
