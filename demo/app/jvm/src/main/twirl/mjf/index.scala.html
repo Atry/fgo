@@ -7,8 +7,10 @@
     <title>MJF</title>
     <link rel="stylesheet" href="/assets/lib/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="/assets/lib/plottable/plottable.css">
+    <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
+
     @scalajs.html.scripts("client", name => s"/assets/$name", name => getClass.getResource(s"/public/$name") != null)
 </body>
 </html>

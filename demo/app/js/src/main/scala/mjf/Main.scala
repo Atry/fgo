@@ -1,25 +1,24 @@
 package mjf
 
-import org.scalajs.dom.{ext, document}
+import org.scalajs.dom.{document, ext, Event}
+import org.scalajs.dom.raw.{HTMLInputElement, Node}
 
 import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.JSApp
-import scalatags.JsDom.all._
-import scalatags.JsDom.svgTags._
 import autowire._
-import js.Dynamic.{global, newInstance}
+import com.thoughtworks.binding.dom.Runtime.TagsAndTags2
 
-//import scalatags.JsDom.svgAttrs._
+import scalatags.JsDom
+
+import scalajs.concurrent.JSExecutionContext.Implicits.runNow
 import upickle.default._
 import upickle.Js
 import scala.concurrent.Future
-import scalajs.concurrent.JSExecutionContext.Implicits.runNow
 import scala.language.postfixOps
-import scala.scalajs.js.annotation.JSName
+import com.thoughtworks.binding.Binding
 import com.thoughtworks.binding.Binding.{Var, Vars}
 import com.thoughtworks.binding.dom
-
 import plottable.Plottable._
 
 
@@ -50,8 +49,12 @@ object TestAPI extends Api {
 
 object View {
 
+  import UIModel._
+
+  implicit def toSvgTags(t: TagsAndTags2.type) = JsDom.svgTags
+
   object Graph {
-    def build(id: String, graph: Model.Graph) = {
+    def build(id: String)(graph: Model.Graph) = {
       val labels = graph.predictions.keys map (_.split(",").head)
       val xDouble = graph.x map (_.toDouble)
       val dataset = graph.predictions.values.map(_ zip xDouble).toList
@@ -82,53 +85,65 @@ object View {
 
       plots.renderTo(id)
     }
-
-//    @dom
-//    def root = svg(id := "graph", width := "100%", height := "100%")
-
-    //      <svg id="graph" width="100%" height="100%"></svg>
   }
 
-//  @dom
-//  def keywords(words: List[String]) = {
-//    <ul>
-//      {for {w <- words} yield {
-//      <li>w</li>
-//    }}
-//    </ul>
-//  }
-
-//  @dom
-//  def toolbar =
-//  {
-//    div(cls := "navbar navbar-default",
-//      a(cls := "navbar-brand", "Montreux Jazz"),
-//      ul(cls := "nav navbar-nav"))
-//  }
-
   @dom
-  def root = {
+  def root(model: RootModel): Binding[Node] = {
     <div class="container-fluid">
+      <svg id="graph"></svg>
+      <video></video>
+      <div id="mosaic"></div>
+      <ul id="keywords" class="list-unstyled">
+        {for (kw <- model.keywords) yield {
+        <li>
+          <a class={s"btn btn-default ${if (kw.selected.bind) "active" else ""}"}
+             onclick={evt: Event => kw.selected := !kw.selected.get}>
+            {kw.value} fasd
+          </a>
+        </li>
+      }}
+      </ul>
     </div>
   }
 
 }
 
 
+object UIModel {
+
+  case class Keyword(value: String, selected: Var[Boolean])
+
+  case class RootModel(graph: Var[Model.Graph], keywords: Vars[Keyword])
+
+}
+
+
 object Handler {
 
-  //  case class RootModel(graph: Option[Model.Graph], keywords: List[String])
+  import UIModel._
+
+  val keywords = Vars.empty[Keyword]
+  val graph = Var(Model.Graph())
+  val model = RootModel(graph, keywords)
 
   def fetchGraph(id: String) = {
     ext.Ajax.get(s"/assets/$id.json").map(_.responseText)
-      .map(read[Model.Graph]) map updateGraph
+      .map(read[Model.Graph]) map (g => {
+      updateGraph(g)
+      updateKeywords(g)
+    })
   }
 
-  def updateGraph(graph: Model.Graph) = View.Graph.build("svg#graph", graph)
+  def updateGraph(graph: Model.Graph) = {
+    View.Graph.build("svg#graph")(graph)
+  }
 
   def updateKeywords(graph: Model.Graph) = {
-    //    View.keywords(graph.predictions.keys)
+    keywords.get.clear()
+    keywords.get ++= graph.predictions.keys.map(kw =>
+      Keyword(kw.split(",").head, selected = Var(false)))
   }
+
 }
 
 
@@ -136,7 +151,7 @@ object App extends JSApp {
 
   def main(): Unit = {
 
-    dom.render(document.body, View.root)
+    dom.render(document.body, View.root(Handler.model))
 
     Handler.fetchGraph("14MLA")
   }
