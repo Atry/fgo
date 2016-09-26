@@ -32,6 +32,8 @@ object Plottable extends js.Object {
     @js.native
     class Pointer() extends Interaction {
       def onPointerEnter(cb: js.Function1[Point, Unit]): Unit = js.native
+
+      def onPointerMove(cb: js.Function1[Point, Unit]): Unit = js.native
     }
 
   }
@@ -75,14 +77,38 @@ object Plottable extends js.Object {
     }
 
     @js.native
+    class GuideLineLayer(orientation: GuideLineLayer.Orientation) extends Component {
+      def scale(s: Scales.Scale): GuideLineLayer = js.native
+
+      def value(x: Double): GuideLineLayer = js.native
+    }
+
+    @js.native
+    object GuideLineLayer extends js.Object {
+
+      @js.native
+      trait Orientation extends js.Object
+
+      val ORIENTATION_VERTICAL: Orientation = js.native
+    }
+
+    @js.native
     class Group[T] extends Component {
       def append(p: Plots.Plot[T]): Unit = js.native
+
+      def append(p: Component): Unit = js.native
     }
 
   }
 
   @js.native
   object Plots extends js.Object {
+
+    @js.native
+    trait PlotEntity extends js.Object {
+      val position: Point = js.native
+      val datum: (Double, Double) = js.native
+    }
 
     @js.native
     trait Plot[T] extends js.Object {
@@ -106,6 +132,7 @@ object Plottable extends js.Object {
 
       def attr(k: String, f: js.Function1[T, String]): Plot[T] = js.native
 
+      def entityNearest(query: Point): PlotEntity = js.native
     }
 
     @js.native

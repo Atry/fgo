@@ -15,6 +15,10 @@ object ServerApi extends Api {
   override def getGraph(name: String) = Future.successful(
     Model.Graph(Map(), Seq())
   )
+
+  override def getMosaic(keywords: List[String]): Future[String] = {
+    Future.successful("img.png")
+  }
 }
 
 
