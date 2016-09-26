@@ -3,19 +3,39 @@ package mjf.plottable
 import scala.scalajs.js
 import scala.scalajs.js.annotation.JSName
 
+object Point {
+  def apply(x: Double, y: Double): Plottable.Point =
+    js.Dynamic.literal(x = x, y = y).asInstanceOf[Plottable.Point]
+}
+
+object RectPoint {
+  def apply(x: Int, y: Int, v: Int): Plottable.RectPoint =
+    js.Dynamic.literal(x = x, y = y, v = v).asInstanceOf[Plottable.RectPoint]
+}
+
 
 @js.native
 object Plottable extends js.Object {
 
   @js.native
   trait Point extends js.Object {
-    val x: Double
-    val y: Double
+    val x: Double = js.native
+    val y: Double = js.native
+  }
+
+
+  @js.native
+  trait RectPoint extends js.Object {
+    val x: Int = js.native
+    val y: Int = js.native
+    val v: Int = js.native
   }
 
   @js.native
   class Dataset[T](data: js.Array[T]) extends js.Object {
     def onUpdate(): Unit = js.native
+
+    def data(data: js.Array[T]): Unit = js.native
   }
 
   @js.native
@@ -44,7 +64,9 @@ object Plottable extends js.Object {
 
     @js.native
     trait Scale extends js.Object {
-      def domain(a: js.Array[String]): Scale = js.native
+      def domain(a: js.Array[_]): Scale = js.native
+
+      def range(r: js.Array[_]): Scale = js.native
     }
 
     @js.native
@@ -57,6 +79,9 @@ object Plottable extends js.Object {
     class Color() extends Scale {
       def scale(s: String): String = js.native
     }
+
+    @js.native
+    class InterpolatedColor() extends Scale
 
   }
 
@@ -93,8 +118,8 @@ object Plottable extends js.Object {
     }
 
     @js.native
-    class Group[T] extends Component {
-      def append(p: Plots.Plot[T]): Unit = js.native
+    class Group extends Component {
+      def append(p: Plots.Plot[_]): Unit = js.native
 
       def append(p: Component): Unit = js.native
     }
@@ -105,9 +130,9 @@ object Plottable extends js.Object {
   object Plots extends js.Object {
 
     @js.native
-    trait PlotEntity extends js.Object {
+    trait PlotEntity[T] extends js.Object {
       val position: Point = js.native
-      val datum: (Double, Double) = js.native
+      val datum: T = js.native
     }
 
     @js.native
@@ -115,6 +140,8 @@ object Plottable extends js.Object {
       def apply(): Line[T] = js.native
 
       def addDataset(data: Dataset[T]): Plot[T] = js.native
+
+      def datasets: js.Array[Dataset[T]] = js.native
 
       def datasets(sets: js.Array[Dataset[T]]): Plot[T] = js.native
 
@@ -132,7 +159,9 @@ object Plottable extends js.Object {
 
       def attr(k: String, f: js.Function1[T, String]): Plot[T] = js.native
 
-      def entityNearest(query: Point): PlotEntity = js.native
+      def attr(k: String, f: js.Function1[T, Double], s: Scales.Scale): Plot[T] = js.native
+
+      def entityNearest(query: Point): PlotEntity[T] = js.native
     }
 
     @js.native
@@ -140,6 +169,9 @@ object Plottable extends js.Object {
 
     @js.native
     class Area[T] extends Plot[T]
+
+    @js.native
+    class Rectangle[T] extends Plot[T]
 
   }
 

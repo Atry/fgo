@@ -20,6 +20,7 @@ import com.thoughtworks.binding.Binding
 import com.thoughtworks.binding.Binding.{Var, Vars}
 import com.thoughtworks.binding.dom
 import plottable.Plottable._
+import plottable._
 
 
 object ClientAPI extends autowire.Client[Js.Value, Reader, Writer] {
@@ -53,79 +54,109 @@ object View {
 
   implicit def toSvgTags(t: TagsAndTags2.type) = JsDom.svgTags
 
-  object Graph {
-    def build(id: String, videoID: String)(graph: Model.Graph) = {
-      val labels = graph.predictions.keys map (_.split(",").head)
-      val xDouble = graph.x map (_.toDouble)
-      val dataset = graph.predictions.values.map(_ zip xDouble).toList
+  def buildGraph(id: String, videoID: String)(graph: Model.Graph) = {
+    val labels = graph.predictions.keys map (_.split(",").head)
+    val xDouble = graph.x map (_.toDouble)
+    val dataset = graph.predictions.values.map(
+      _ zip xDouble map (t => Point(t._2, t._1))).toList
 
-      val colorScale = new Scales.Color()
-      val xScale = new Scales.Linear()
-      val yScale = new Scales.Linear()
+    val colorScale = new Scales.Color()
+    val xScale = new Scales.Linear()
+    val yScale = new Scales.Linear()
 
-      val legend = new Components.Legend(colorScale)
-      colorScale.domain(labels.toJSArray)
-      legend.xAlignment("right")
-      legend.yAlignment("top")
-      legend.renderTo(id)
+    val legend = new Components.Legend(colorScale)
+    colorScale.domain(labels.toJSArray)
+    legend.xAlignment("left")
+    legend.yAlignment("top")
+    legend.renderTo(id)
 
-      val group = new Components.Group[(Double, Double)]()
+    val group = new Components.Group()
 
-      val panZoom = new Interactions.PanZoom(xScale)
-      panZoom.attachTo(group)
+    val panZoom = new Interactions.PanZoom(xScale)
+    panZoom.attachTo(group)
 
-      val plots = dataset.zip(labels).map { case (set, label) =>
-        new Plots.Line[(Double, Double)]()
-          .addDataset(new Dataset(set.toJSArray))
-          .x((d: (Double, Double)) => d._2, xScale)
-          .y((d: (Double, Double)) => d._1, yScale)
-          .attr("stroke", colorScale.scale(label))
-      }
-      plots.foreach(pl => group.append(pl))
-
-
-      val guideline = new Components.GuideLineLayer(
-        Components.GuideLineLayer.ORIENTATION_VERTICAL
-      ).scale(xScale)
-      group.append(guideline)
+    val plots = dataset.zip(labels).map { case (set, label) =>
+      new Plots.Line[Point]()
+        .addDataset(new Dataset(set.toJSArray))
+        .x((d: Point) => d.x, xScale)
+        .y((d: Point) => d.y, yScale)
+        .attr("stroke", colorScale.scale(label))
+    }
+    plots.foreach(pl => group.append(pl))
 
 
-      val video = document.getElementById(videoID).asInstanceOf[HTMLVideoElement]
-      js.timers.setInterval(10) {
-        if (!video.paused) {
-          val t = video.currentTime
-          val fps = 50
-          val frame = t * fps
-          guideline.value(frame)
-        }
-      }
+    val guideline = new Components.GuideLineLayer(
+      Components.GuideLineLayer.ORIENTATION_VERTICAL
+    ).scale(xScale)
+    group.append(guideline)
 
-      val pointer = new Interactions.Pointer()
-      pointer.onPointerMove((p: Point) => {
-        val frame = plots(0).entityNearest(p).datum._2
-        //        selectedPoint1.datasets()[0].data([nearestEntityByX.datum]);
+
+    val video = document.getElementById(videoID).asInstanceOf[HTMLVideoElement]
+    js.timers.setInterval(10) {
+      if (!video.paused) {
+        val t = video.currentTime
+        val fps = 50
+        val frame = t * fps
         guideline.value(frame)
-        val fps = 50.0
-        val t = frame / fps
-        video.currentTime = t
-        ()
-      })
-      pointer.attachTo(group)
+      }
+    }
 
-      group.renderTo(id)
+    val pointer = new Interactions.Pointer()
+    pointer.onPointerMove((p: Point) => {
+      val point = plots.head.entityNearest(p).datum
+      //        selectedPoint1.datasets()[0].data([nearestEntityByX.datum]);
+      guideline.value(point.x)
+
+      val fps = 50.0
+      val t = point.x / fps
+      video.currentTime = t
+      ()
+    })
+    pointer.attachTo(group)
+
+    group.renderTo(id)
+  }
+
+
+  def denseToSparse(width: Int)(map: Seq[Int]): Seq[RectPoint] = {
+    map.zipWithIndex map { case (v, i) =>
+      RectPoint(Math.floorMod(i, width), Math.floor(i / width).toInt, v)
     }
   }
 
+  def maps(parentID: String)(maps: Model.Maps, frame: Var[Int]) = {
+    val xScale = new Scales.Category()
+    val yScale = new Scales.Category()
+    val colorScale = new Scales.InterpolatedColor()
+//    colorScale.range(List("#BDCEF0", "#5279C7").toJSArray)
+    colorScale.domain(List(0,24).toJSArray)
+
+    val data = maps.maps.map(denseToSparse(maps.width))
+    val data1 = data(frame.get)
+
+    val plot = new Plots.Rectangle[RectPoint]()
+      .addDataset(new Dataset(data1.toJSArray))
+      .x((p: RectPoint) => p.x.toDouble, xScale)
+      .y((p: RectPoint) => p.y.toDouble, yScale)
+      .attr("fill", (p: RectPoint) => p.v.toDouble, colorScale)
+      .renderTo(parentID)
+
+    plot.datasets.head.data(data(20).toJSArray)
+    plot.renderTo(parentID)
+  }
+
+
   @dom
   def video(name: String): Binding[Node] =
-    <video controls={true} id="video" style="width:640px;height:360px;">
+    <video controls={true} id="video" preload="auto" style="width:640px;height:360px;">
       <source src={s"http://localhost:8000/$name.mp4"} type="video/mp4"></source>
     </video>
 
   @dom
   def root(model: RootModel): Binding[Node] = {
     <div class="container-fluid">
-      <svg id="graph"></svg>{video(model.name.bind).bind}<div id="mosaic"></div>
+      <svg id="graph"></svg>{video(model.name.bind).bind}<svg id="maps"></svg>
+      <div id="mosaic"></div>
       <ul id="keywords" class="list-unstyled">
         {for (kw <- model.keywords) yield {
         <li>
@@ -148,7 +179,13 @@ object UIModel {
 
   case class Keyword(value: String, selected: Var[Boolean])
 
-  case class RootModel(name: Var[String], graph: Var[Model.Graph], keywords: Vars[Keyword], mosaicFilename: Var[String])
+  case class RootModel(
+                        name: Var[String],
+                        graph: Var[Model.Graph],
+                        keywords: Vars[Keyword],
+                        mosaicFilename: Var[String],
+                        maps: Var[Model.Maps],
+                        currentFrame: Var[Int])
 
 }
 
@@ -157,31 +194,47 @@ object Handler {
 
   import UIModel._
 
-  val keywords = Vars.empty[Keyword]
-  val graph = Var(Model.Graph())
-  val name = Var("14MLA")
-  val mosaicFilename = Var("")
-  val model = RootModel(name, graph, keywords, mosaicFilename)
+  val model = RootModel(
+    name = Var("14MLA"),
+    graph = Var(Model.Graph()),
+    keywords = Vars.empty[Keyword],
+    mosaicFilename = Var(""),
+    maps = Var(Model.Maps()),
+    currentFrame = Var(100))
+
 
   def fetchGraph(id: String) = {
-    ext.Ajax.get(s"/assets/$id.json").map(_.responseText)
-      .map(read[Model.Graph]) map (g => {
-      model.graph := g
-      updateGraph()
-      //      name := id
-    })
+    ext.Ajax.get(s"/assets/$id.json")
+      .map(_.responseText)
+      .map(read[Model.Graph])
+      .map(g => {
+        model.graph := g
+        updateGraph()
+        //      name := id
+        Handler.fetchMaps(id)
+      })
+  }
+
+  def fetchMaps(id: String) = {
+    ext.Ajax.get(s"/assets/${id}_maps.json")
+      .map(_.responseText)
+      .map(read[Model.Maps])
+      .map { m =>
+        model.maps := m
+        View.maps("svg#maps")(model.maps.get, model.currentFrame)
+      }
   }
 
   def updateGraph() = {
-    View.Graph.build("svg#graph", "video")(model.graph.get)
-    keywords.get.clear()
-    keywords.get ++= model.graph.get.predictions.keys.map(kw =>
+    View.buildGraph("svg#graph", "video")(model.graph.get)
+    model.keywords.get.clear()
+    model.keywords.get ++= model.graph.get.predictions.keys.map(kw =>
       Keyword(kw.split(",").head, selected = Var(false)))
   }
 
 
   def updateMosaic() = {
-    val selected = keywords.get.filter(_.selected.get).map(_.value).toList
+    val selected = model.keywords.get.filter(_.selected.get).map(_.value).toList
     ClientAPI[Api].getMosaic(selected).call() map { imageFilename =>
       model.mosaicFilename := imageFilename
     }

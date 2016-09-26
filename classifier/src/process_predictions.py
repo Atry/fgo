@@ -87,6 +87,7 @@ def main():
   parser.add_argument('--video_output')
   parser.add_argument('--npy_output')
   parser.add_argument('--json_output')
+  parser.add_argument('--map_output')
   args = parser.parse_args()
 
   meta = read_metadata(args.metadata)
@@ -118,6 +119,17 @@ def main():
       x=list(range(predictions.shape[0]))
     )
     with open(args.json_output, 'w') as fp:
+      json.dump(obj, fp)
+
+  if args.map_output is not None:
+    top = predictions.argmax(axis=-1).reshape([predictions.shape[0], -1]).tolist()
+    obj = dict(
+      height=predictions.shape[1],
+      width=predictions.shape[2],
+      fps=meta['sampled_fps'],
+      maps=top
+    )
+    with open(args.map_output, 'w') as fp:
       json.dump(obj, fp)
 
 main()
